@@ -1,0 +1,122 @@
+name: Verificar y desplegar en Amplify
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "front/**"
+      - ".github/workflows/deploy.yml"
+  pull_request:
+    paths:
+      - "front/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: amplify-deploy
+  cancel-in-progress: false
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Funciones prohibidas
+        run: |
+          if grep -rnE "innerHTML|outerHTML|insertAdjacentHTML|eval\(|document\.write" front/; then
+            echo "::error::Se encontró una función prohibida"; exit 1
+          fi
+
+      - name: Sin dominios externos (excepto config.js)
+        run: |
+          if grep -rnE "https?://" front/index.html front/app.js front/styles.css | grep -vE "localhost|127\.0\.0\.1"; then
+            echo "::error::Hay referencias a dominios externos"; exit 1
+          fi
+
+      - name: config.js solo con API_URL y API_KEY
+        run: |
+          node -e '
+            const fs = require("fs"), vm = require("vm");
+            const ctx = { window: {} };
+            vm.runInNewContext(fs.readFileSync("front/config.js", "utf8"), ctx);
+            const keys = Object.keys(ctx.window.QUIZ_CONFIG || {}).sort().join(",");
+            if (keys !== "API_KEY,API_URL" || Object.keys(ctx.window).join() !== "QUIZ_CONFIG") {
+              console.error("config.js inválido:", keys); process.exit(1);
+            }'
+
+      - name: Validar questions.json
+        run: |
+          node -e '
+            const qs = JSON.parse(require("fs").readFileSync("front/questions.json", "utf8"));
+            const ok = new Set(["id", "bloque", "q", "a", "t"]);
+            if (!Array.isArray(qs) || !qs.length) throw new Error("Debe ser un arreglo no vacío");
+            const ids = new Set();
+            qs.forEach((q, i) => {
+              const extra = Object.keys(q).filter(k => !ok.has(k));
+              if (extra.length) throw new Error(`Pregunta ${i + 1}: campos no permitidos ${extra}`);
+              if (typeof q.id !== "string" || ids.has(q.id)) throw new Error(`Pregunta ${i + 1}: id inválido o repetido`);
+              ids.add(q.id);
+              if (!["T", "CLF", "AIF"].includes(q.bloque)) throw new Error(`${q.id}: bloque inválido`);
+              if (typeof q.q !== "string" || !q.q) throw new Error(`${q.id}: falta q`);
+              if (!Array.isArray(q.a) || q.a.length !== 4 || !q.a.every(x => typeof x === "string" && x)) throw new Error(`${q.id}: a debe tener 4 textos`);
+              if (typeof q.t !== "number" || q.t <= 0) throw new Error(`${q.id}: t inválido`);
+            });
+            console.log(qs.length + " preguntas válidas");'
+
+      - name: Sintaxis de app.js
+        run: node --check front/app.js
+
+  desplegar:
+    needs: verificar
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AMPLIFY_APP_ID: ${{ vars.AMPLIFY_APP_ID }}
+      AMPLIFY_BRANCH: ${{ vars.AMPLIFY_BRANCH }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Generar config.js con los valores reales
+        env:
+          QUIZ_API_URL: ${{ secrets.QUIZ_API_URL }}
+          QUIZ_API_KEY: ${{ secrets.QUIZ_API_KEY }}
+        run: |
+          test -n "$QUIZ_API_URL" && test -n "$QUIZ_API_KEY" || { echo "::error::Faltan QUIZ_API_URL o QUIZ_API_KEY"; exit 1; }
+          node -e '
+            const v = JSON.stringify({ API_URL: process.env.QUIZ_API_URL, API_KEY: process.env.QUIZ_API_KEY }, null, 2);
+            require("fs").writeFileSync("front/config.js", "window.QUIZ_CONFIG = " + v + ";\n");'
+
+      - name: Empaquetar
+        run: cd front && zip -r -X ../sitio.zip index.html config.js questions.json styles.css app.js
+
+      - name: Subir y desplegar
+        run: |
+          set -euo pipefail
+          out=$(aws amplify create-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH")
+          job_id=$(echo "$out" | jq -r .jobId)
+          upload_url=$(echo "$out" | jq -r .zipUploadUrl)
+          curl --fail --silent --show-error -X PUT -H "Content-Type: application/zip" --upload-file sitio.zip "$upload_url"
+          aws amplify start-deployment --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --job-id "$job_id" > /dev/null
+          for i in $(seq 1 60); do
+            status=$(aws amplify get-job --app-id "$AMPLIFY_APP_ID" --branch-name "$AMPLIFY_BRANCH" --job-id "$job_id" --query job.summary.status --output text)
+            echo "Estado: $status"
+            case "$status" in
+              SUCCEED) exit 0 ;;
+              FAILED|CANCELLED) echo "::error::El despliegue terminó en $status"; exit 1 ;;
+            esac
+            sleep 5
+          done
+          echo "::error::Tiempo de espera agotado"; exit 1

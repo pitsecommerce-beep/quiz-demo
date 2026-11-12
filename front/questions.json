@@ -1,0 +1,23 @@
+[
+  {
+    "id": "Q-C06-001",
+    "bloque": "CLF",
+    "q": "¿Qué servicio de AWS permite ejecutar código sin aprovisionar ni administrar servidores?",
+    "a": ["Amazon EC2", "AWS Lambda", "Amazon RDS", "Amazon Lightsail"],
+    "t": 30
+  },
+  {
+    "id": "Q-C06-002",
+    "bloque": "AIF",
+    "q": "En aprendizaje automático, ¿cómo se llama el conjunto de datos que se reserva para medir el desempeño final del modelo?",
+    "a": ["Conjunto de entrenamiento", "Conjunto de validación", "Conjunto de prueba", "Conjunto de etiquetas"],
+    "t": 25
+  },
+  {
+    "id": "Q-C06-003",
+    "bloque": "T",
+    "q": "¿Qué código de estado HTTP indica que la solicitud fue aceptada pero aún no se ha procesado?",
+    "a": ["200 OK", "201 Created", "202 Accepted", "204 No Content"],
+    "t": 20
+  }
+]

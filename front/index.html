@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="dark">
+  <title>Quiz</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip" href="#card">Saltar al contenido</a>
+
+  <main class="shell">
+    <header class="topbar">
+      <span class="brand">Quiz</span>
+      <span class="alias" id="alias-box" hidden>Tu alias: <strong id="alias-value"></strong></span>
+    </header>
+
+    <section id="card" class="card" tabindex="-1" aria-label="Quiz">
+      <div id="screen-loading" class="screen">
+        <p class="muted">Cargando preguntas…</p>
+      </div>
+
+      <div id="screen-intro" class="screen" hidden>
+        <h1 class="title">Antes de empezar</h1>
+        <p class="lead" id="intro-count"></p>
+        <ul class="facts">
+          <li>Cada pregunta tiene cuatro opciones y un tiempo límite.</li>
+          <li>Solo puedes responder una vez por pregunta.</li>
+          <li>Al responder verás si acertaste y la explicación.</li>
+          <li>Usa las teclas <kbd>1</kbd> a <kbd>4</kbd> para elegir y <kbd>Enter</kbd> para continuar.</li>
+        </ul>
+        <p class="note">Participas con un alias anónimo. No se pide tu nombre ni ningún dato personal.</p>
+        <p class="banner banner-warn" id="intro-warn" role="status" hidden></p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="start">Comenzar</button>
+        </div>
+      </div>
+
+      <div id="screen-question" class="screen" hidden>
+        <div class="meta">
+          <span id="counter" class="counter"></span>
+          <span id="bloque" class="tag"></span>
+          <span id="timer" class="timer" role="timer" aria-label="Tiempo restante"></span>
+        </div>
+        <div class="progress" id="progress" role="progressbar" aria-label="Progreso del quiz" aria-valuemin="0">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+
+        <div id="q-body" class="q-body">
+          <h1 id="q-text" class="question" tabindex="-1"></h1>
+          <div id="options" class="options" role="group" aria-labelledby="q-text"></div>
+          <div id="result" class="result" aria-live="polite" aria-atomic="true"></div>
+          <div class="actions">
+            <button type="button" class="btn btn-ghost" id="retry" hidden>Reintentar</button>
+            <button type="button" class="btn btn-primary" id="next" hidden>Siguiente</button>
+          </div>
+        </div>
+        <p class="sr-only" id="timer-live" aria-live="assertive"></p>
+      </div>
+
+      <div id="screen-final" class="screen" hidden>
+        <h1 class="title" tabindex="-1" id="final-title">Terminaste</h1>
+        <p class="score"><span id="score-num"></span><span class="score-of" id="score-of"></span></p>
+        <div class="progress progress-lg" aria-hidden="true">
+          <div class="progress-fill" id="score-fill"></div>
+        </div>
+        <p class="lead" id="final-msg"></p>
+        <ul class="breakdown" id="breakdown"></ul>
+        <p class="note">Si tu docente te lo pide, comparte tu alias: <strong id="final-alias"></strong></p>
+      </div>
+
+      <div id="screen-error" class="screen" hidden>
+        <h1 class="title" tabindex="-1" id="error-title">No se pudo cargar el quiz</h1>
+        <p class="lead" id="error-msg"></p>
+        <div class="actions">
+          <button type="button" class="btn btn-primary" id="reload">Volver a intentar</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
